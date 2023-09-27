@@ -180,7 +180,7 @@ class Plot:
         pass
 
 
-def make_plots(op_params, w0, z0, λ = 705e-9,  start_buffer = 1, stop_buffer = 1, num_points = 100):
+def make_plots(op_params, w0, z0,  start_buffer = 1, stop_buffer = 1, λ = 1550e-9, num_points = 100):
     """
     Given a list of operations and their relevant arguments, make plots that show a beam propagating through that system
     """
@@ -190,8 +190,9 @@ def make_plots(op_params, w0, z0, λ = 705e-9,  start_buffer = 1, stop_buffer = 
     progressive_ops = []
     progressive_params = []
     # plot starting buffer
-    p = Plot(pos - start_buffer, pos, w0, z0, λ, num_points, progressive_ops.copy(), progressive_params.copy(), 'blue')
-    ret.append(p)
+    if start_buffer:
+        p = Plot(pos - start_buffer, pos, w0, z0, λ, num_points, progressive_ops.copy(), progressive_params.copy(), 'blue')
+        ret.append(p)
     for i in range(num_ops):
         op, param, color, variable = op_params[i]
         if op.__name__ == 'prop':
@@ -204,10 +205,11 @@ def make_plots(op_params, w0, z0, λ = 705e-9,  start_buffer = 1, stop_buffer = 
         progressive_ops.append(op)
         progressive_params.append(param)
     # Plot ending buffer
-    start = pos
-    stop = pos + stop_buffer
-    p = Plot(start, stop, w0, z0, λ, num_points, progressive_ops, progressive_params, 'blue')
-    ret.append(p)
+    if stop_buffer:
+        start = pos
+        stop = pos + stop_buffer
+        p = Plot(start, stop, w0, z0, λ, num_points, progressive_ops, progressive_params, 'blue')
+        ret.append(p)
     return ret
 
 
@@ -227,11 +229,6 @@ curr_fig.set_figheight(6)
 curr_fig.set_figwidth(10)
 plt.subplots_adjust(left=0.15, bottom=0.35)
 
-w0 = 0.0005 # input waist size in meters
-z0 = -0.001 # input location in meters (can't be zero because I get a div/0 error)
-f1 = 1 # focal length of lens 1
-d1 = 1 # progation distance 1
-f2 = 4 # focal length of lens 2
 
 
 # Define the operations that will happen. Each sub-list item consists of an ABCD matrix, 
@@ -240,11 +237,34 @@ f2 = 4 # focal length of lens 2
 # for specifying static/dynamic parameters. Note that order of operations in the list is left-to-right,
 # so element 0 will happen first, then element 1, and so on.
 
-# op_params = [[thin_lens,1,'blue'], [thin_lens,f1,'red'],[prop,d1,'green'],[thin_lens,f2,'purple']]
-op_params = [[prop, d1, 'green', s],[thin_lens, f1, None, s],[prop, d1, 'red', s],[thin_lens, f2, None, s],[prop, d1, 'green', s]]
+
+
+# w0 = 0.0005 # input waist size in meters
+# z0 = -0.001 # input location in meters (can't be zero because I get a div/0 error)
+# f1 = 1 # focal length of lens 1
+# d1 = 1 # progation distance 1
+# f2 = 4 # focal length of lens 2
+# op_params = [[prop, d1, 'green', s],[thin_lens, f1, None, s],[prop, d1, 'red', s],[thin_lens, f2, None, s],[prop, d1, 'green', s]]
+
+
+
+
+
+
+w0 = 5.2E-6 # input waist size in meters
+z0 = -0.0001 # input location in meters (can't be zero because I get a div/0 error)
+d1 = 0.00992556 # progation distance from fiber to collimating lens
+f1 = 9.6E-3 # focal length of lens 1
+d2 = 0.915 # propagation distance from collimating lens to first spherical mirror
+roc1 = 1 # radius of curvature of spherical mirror 1
+d3 = 1.96 # distance between spherical mirrors
+roc2 = 1 # radius of curvature of spherical mirror 2
+op_params = [[prop, d1, 'green', s],[thin_lens, f1, None, s],[prop, d2, 'red', s],[s_mirror, roc1, None, s],[prop, d3, 'green', s],[s_mirror, roc2, None, s],[prop, 1, 'green', s]]
 
 # Take operations and their parameters and make plots for each one
-plots = make_plots(op_params, w0, z0)
+plots = make_plots(op_params, w0, z0, start_buffer = 0.0000001)
+
+
 
 # from pprint import pprint
 # pprint(vars(plots[0]))
