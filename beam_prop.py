@@ -252,7 +252,7 @@ plt.subplots_adjust(left=0.15, bottom=0.35)
 
 
 w0 = 5.2E-6 # input waist size in meters
-z0 = -0.0001 # input location in meters (can't be zero because I get a div/0 error)
+z0 = 0.0001 # input location in meters (can't be zero because I get a div/0 error)
 d1 = 0.00992556 # progation distance from fiber to collimating lens
 f1 = 9.6E-3 # focal length of lens 1
 d2 = 0.915 # propagation distance from collimating lens to first spherical mirror
@@ -341,8 +341,8 @@ for i in range(len(op_params)):
         ax=curr_ax,
         label='Parameter {}'.format(i+1),
         # label="{}".format(variable_name),
-        valmin=0,
-        valmax=30,
+        valmin=curr_param*0.75,
+        valmax=curr_param*1.25,
         valinit=curr_param,
     )
 
