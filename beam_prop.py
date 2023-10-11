@@ -1,9 +1,9 @@
 import numpy as np
-from numpy import sqrt, pi, matmul
+from numpy import sqrt, pi, matmul, inf
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, Button, RadioButtons
 
-from abcd import waist_eq, waist2, thin_lens, s_mirror, prop, loopMat
+from abcd import waist_eq, waist2, interface, s_mirror, prop, loopMat
 
 
 
@@ -85,20 +85,28 @@ class Trie:
 #     return(ret)
 
 
+class Op:
+    def __init__(self, op, *args, **kwargs):
+        self.op = op
+        self.args = [*args]
+        self.color = None
+        self.static = True
+        self.__dict__.update(kwargs)
 
 
- 
+
 class Plot:
     """
     To make things interactive it is helpful if we keep around the parameters used to make each plot.
     This is probably not the most efficient way to do it but for now it's fine.
     """
-    def __init__(self, start, stop, w0, z0, λ, num_points, prog_ops, prog_params, color):
+    def __init__(self, start, stop, w0, z0, λ, n, num_points, prog_ops, prog_params, color):
         self.start = start
         self.stop = stop
         self.w0 = w0
         self.z0 = z0
         self.λ = λ
+        self.n = n
         self.num_points = num_points
         self.prog_ops = prog_ops
         self.prog_params = prog_params
@@ -113,19 +121,19 @@ class Plot:
     def y(self):
         if not self.prog_ops:
             # print("calculating waist1")
-            return waist_eq(self.λ, self.w0, self.x, self.z0)
+            return waist_eq(self.λ, self.w0, self.x, self.z0, self.n)
         else:
             # print("calculating waist2")
-            return waist2(self.λ, self.w0, self.z0, matmul(prop(self.x-self.start),loopMat(self.prog_ops, self.prog_params)))
+            return waist2(self.λ, self.w0, self.z0, self.n, matmul(prop(self.x-self.start, self.n),loopMat(self.prog_ops, self.prog_params)))
 
     def set_new_data(self):
-        self.plot.set_data(self.x, waist2(self.λ, self.w0, self.z0, matmul(prop(self.x-self.start),loopMat(self.prog_ops, self.prog_params))))
+        self.plot.set_data(self.x, waist2(self.λ, self.w0, self.z0, self.n, matmul(prop(self.x-self.start, self.n),loopMat(self.prog_ops, self.prog_params))))
 
     def update_param(self, slider):
         def update(val):
             new_val = slider.val
             self.prog_params[-1] = new_val
-            self.plot.set_data(self.x, waist2(self.λ, self.w0, self.z0, matmul(prop(self.x-self.start),loopMat(self.prog_ops, self.prog_params))))
+            self.plot.set_data(self.x, waist2(self.λ, self.w0, self.z0, self.n, matmul(prop(self.x-self.start, self.n),loopMat(self.prog_ops, self.prog_params))))
             fig.canvas.draw_idle()
         
         slider.on_changed(update)
@@ -134,45 +142,77 @@ class Plot:
         pass
 
 
-def make_plots(op_params, w0, z0,  start_buffer = 1, stop_buffer = 1, λ = 1550e-9, num_points = 100):
+# def make_plots(op_params, w0, z0, start_buffer = 1, stop_buffer = 1, λ = 1550e-9, num_points = 100):
+#     """
+#     Given a list of operations and their relevant arguments, make plots that show a beam propagating through that system
+#     """
+#     ret = []
+#     num_ops = len(op_params)
+#     pos = 0
+#     progressive_ops = []
+#     progressive_params = []
+#     # plot starting buffer
+#     if start_buffer:
+#         p = Plot(pos - start_buffer, pos, w0, z0, λ, num_points, progressive_ops.copy(), progressive_params.copy(), 'blue')
+#         ret.append(p)
+#     for i in range(num_ops):
+#         op, param, color, variable = op_params[i]
+#         if op.__name__ == 'prop':
+#             # if it's a beam propagation step then plot, otherwise just add the operation to the list
+#             start = pos
+#             stop = pos + param
+#             pos += param
+#             p = Plot(start, stop, w0, z0, λ, num_points, progressive_ops.copy(), progressive_params.copy(), color)
+#             ret.append(p)
+#         progressive_ops.append(op)
+#         progressive_params.append(param)
+#     # Plot ending buffer
+#     if stop_buffer:
+#         start = pos
+#         stop = pos + stop_buffer
+#         p = Plot(start, stop, w0, z0, λ, num_points, progressive_ops, progressive_params, 'blue')
+#         ret.append(p)
+#     return ret
+
+
+def make_plots(op_list, w0, z0, start_buffer = 1, stop_buffer = 1, λ = 1550e-9, num_points = 100):
     """
     Given a list of operations and their relevant arguments, make plots that show a beam propagating through that system
     """
     ret = []
-    num_ops = len(op_params)
+    num_ops = len(op_list)
     pos = 0
     progressive_ops = []
     progressive_params = []
     # plot starting buffer
     if start_buffer:
-        p = Plot(pos - start_buffer, pos, w0, z0, λ, num_points, progressive_ops.copy(), progressive_params.copy(), 'blue')
+        p = Plot(pos - start_buffer, pos, w0, z0, λ, 1, num_points, progressive_ops.copy(), progressive_params.copy(), 'blue')
         ret.append(p)
-    for i in range(num_ops):
-        op, param, color, variable = op_params[i]
-        if op.__name__ == 'prop':
+    for operation in op_list:
+        if operation.op.__name__ == 'prop':
             # if it's a beam propagation step then plot, otherwise just add the operation to the list
+            d, n = operation.args
+            color = operation.color
+            travel_distance = d
             start = pos
-            stop = pos + param
-            pos += param
-            p = Plot(start, stop, w0, z0, λ, num_points, progressive_ops.copy(), progressive_params.copy(), color)
+            stop = pos + travel_distance
+            pos += travel_distance
+            p = Plot(start, stop, w0, z0, λ, n, num_points, progressive_ops.copy(), progressive_params.copy(), color)
             ret.append(p)
-        progressive_ops.append(op)
-        progressive_params.append(param)
+        progressive_ops.append(operation)
+        progressive_params.append(operation.args)
     # Plot ending buffer
     if stop_buffer:
         start = pos
         stop = pos + stop_buffer
-        p = Plot(start, stop, w0, z0, λ, num_points, progressive_ops, progressive_params, 'blue')
+        p = Plot(start, stop, w0, z0, λ, 1, num_points, progressive_ops, progressive_params, 'blue')
         ret.append(p)
     return ret
 
 
 
 
-
 if __name__ == "__main__":
-    s = 'static'
-    v = 'variable'
     fig, ax = plt.subplots()
 
     curr_fig = plt.gcf()
@@ -201,19 +241,29 @@ if __name__ == "__main__":
 
 
 
-
+    asphereIndex = 1.5677 # index of refraction for the collimating asphere
+    asphereTc = 2.493E-3 # center thickness of collimating asphere
+    asphereROC = -5.609928E-3 # Radius of curvature of asphere
     w0 = 5.2E-6 # input waist size in meters
     z0 = 0.0 # input location in meters (can't be zero because I get a div/0 error)
-    d1 = 0.009595 # progation distance from fiber to collimating lens
+    d1 = 0.008885 # progation distance from fiber to collimating lens
     f1 = 9.6E-3 # focal length of lens 1
-    d2 = 0.484214 # propagation distance from collimating lens to first spherical mirror
+    d2 = 1.18 # propagation distance from collimating lens to first spherical mirror
     roc1 = 2 # radius of curvature of spherical mirror 1
-    d3 = 1.7444 # distance between spherical mirrors
+    d3 = 1.755 # distance between spherical mirrors
     roc2 = 2 # radius of curvature of spherical mirror 2
-    op_params = [[prop, d1, 'green', s],[thin_lens, f1, None, s],[prop, d2, 'red', s],[s_mirror, roc1, None, s],[prop, d3, 'green', s],[s_mirror, roc2, None, s],[prop, 1, 'green', s]]
+    opList = [Op(prop, d1, 1, color='Blue', static=False), 
+            Op(interface, 1, asphereIndex, inf), 
+            Op(prop, asphereTc, asphereIndex, color='Red'), 
+            Op(interface, asphereIndex, 1, asphereROC),
+            Op(prop, d2, 1, color='Blue'),
+            Op(s_mirror, 2),
+            Op(prop, d3, 1, color='Blue'),
+            Op(s_mirror, 2),
+            Op(prop, 1, 1, color='Blue')]
 
     # Take operations and their parameters and make plots for each one
-    plots = make_plots(op_params, w0, z0, start_buffer = 0.0000001)
+    plots = make_plots(opList, w0, z0, start_buffer = 0.00, stop_buffer = 0.0)
 
 
 
@@ -240,7 +290,14 @@ if __name__ == "__main__":
     #             return name
     #     return None
 
-    # The function to be called anytime a slider's value changes
+    
+
+
+
+
+# Current problem as of 10/6 5 PM: I only want a slider for operations that are not set to "static" but update only goes through the sliders that exist.
+
+    # # The function to be called anytime a slider's value changes
     def update(val):
         # new_op_params = op_params.copy()
 
@@ -249,14 +306,26 @@ if __name__ == "__main__":
         ssp = []
         pos = 0
 
-        for i in range(len(input_sliders)):
-            curr_slider_values.append(input_sliders[i].val)
+        for i, operation in enumerate(opList):
+            if operation.static:
+                # just add the static parameters to the thing
+                pass
 
-            # new_op_params[i][1] = input_sliders[i].val
-            if op_params[i][0].__name__ == 'prop':
+
+        for i in range(len(input_sliders)):
+            # go through each slider that exists
+
+            curr_slider_values.append(input_sliders[i].val) # take value of slider
+
+            operation = opList[i]
+            
+            if operation.op.__name__ == 'prop':
+                # if altering a propagation op, then the length of the plot must change
+                d, n = operation.args
                 start = pos
-                stop = pos + input_sliders[i].val
-                pos += input_sliders[i].val
+                updated_distace = input_sliders[i].val
+                stop = pos + updated_distace
+                pos += updated_distace
                 ssp.append((start,stop,pos))
                 if i==0:
                     curr_prop_values.append([])
@@ -282,24 +351,64 @@ if __name__ == "__main__":
         # fig.subplots_adjust(left=0.25, bottom=0.25)
         fig.canvas.draw_idle()
 
-    for i in range(len(op_params)):
-        op, curr_param, color, variable = op_params[i]
-            # variable_name = find_variable_name(curr_param, globals())
+    for i, operation in enumerate(opList):
+        # go through each of the operations in opList
+        if not operation.static:
+            # if operation is not set to 'static'
+            # op = operation.op
+            # color = operation.color
+            # static = operation.static
+            # the argument to be varied
+            var_arg = operation.args[0]
 
-        # Make a horizontal slider to control the frequency.
-        curr_ax = fig.add_axes([slider_start_w, slider_start_h + (len(op_params)-i-2)*slider_spacing, slider_start_w + slider_width, slider_height])
-        curr_slider = Slider(
-            ax=curr_ax,
-            label='Parameter {}'.format(i+1),
-            # label="{}".format(variable_name),
-            valmin=curr_param*0.75,
-            valmax=curr_param*1.25,
-            valinit=curr_param,
-        )
 
-        curr_slider.on_changed(update)
-        input_params.append(curr_param)
-        input_sliders.append(curr_slider)
+                # variable_name = find_variable_name(curr_param, globals())
+
+            # Make a horizontal slider to control the frequency.
+            curr_ax = fig.add_axes([slider_start_w, slider_start_h + (len(opList)-i-2)*slider_spacing, slider_start_w + slider_width, slider_height])
+            curr_slider = Slider(
+                ax=curr_ax,
+                label='Parameter {}'.format(i+1),
+                # label="{}".format(variable_name),
+                valmin=var_arg*0.75,
+                valmax=var_arg*1.25,
+                valinit=var_arg,
+            )
+
+            curr_slider.on_changed(update)
+            input_params.append(var_arg)
+            input_sliders.append(curr_slider)
+
+
+
+
+
+
+
+
+
+
+
+
+
+    # for i in range(len(op_params)):
+    #     op, curr_param, color, variable = op_params[i]
+    #         # variable_name = find_variable_name(curr_param, globals())
+
+    #     # Make a horizontal slider to control the frequency.
+    #     curr_ax = fig.add_axes([slider_start_w, slider_start_h + (len(op_params)-i-2)*slider_spacing, slider_start_w + slider_width, slider_height])
+    #     curr_slider = Slider(
+    #         ax=curr_ax,
+    #         label='Parameter {}'.format(i+1),
+    #         # label="{}".format(variable_name),
+    #         valmin=curr_param*0.75,
+    #         valmax=curr_param*1.25,
+    #         valinit=curr_param,
+    #     )
+
+    #     curr_slider.on_changed(update)
+    #     input_params.append(curr_param)
+    #     input_sliders.append(curr_slider)
 
     # This is to make the plot interactive with sliders. Very hard to make this general
     plt.show()
