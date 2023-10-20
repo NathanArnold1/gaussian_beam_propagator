@@ -252,23 +252,20 @@ if __name__ == "__main__":
     roc1 = 2 # radius of curvature of spherical mirror 1
     d3 = 1.755 # distance between spherical mirrors
     roc2 = 2 # radius of curvature of spherical mirror 2
+    start_buffer = 0.00
+    stop_buffer = 0.0
     opList = [Op(prop, d1, 1, color='Blue', static=False), 
             Op(interface, 1, asphereIndex, inf), 
             Op(prop, asphereTc, asphereIndex, color='Red'), 
             Op(interface, asphereIndex, 1, asphereROC),
             Op(prop, d2, 1, color='Blue'),
-            Op(s_mirror, 2),
+            Op(s_mirror, 2, static=False),
             Op(prop, d3, 1, color='Blue'),
             Op(s_mirror, 2),
-            Op(prop, 1, 1, color='Blue')]
+            Op(prop, 1, 1, color='Green')]
 
     # Take operations and their parameters and make plots for each one
-    plots = make_plots(opList, w0, z0, start_buffer = 0.00, stop_buffer = 0.0)
-
-
-
-    # from pprint import pprint
-    # pprint(vars(plots[0]))
+    plots = make_plots(opList, w0, z0, start_buffer, stop_buffer)
 
     # adjust the main plot to make room for the sliders
     fig.subplots_adjust(left=0.25, bottom=0.25)
@@ -284,17 +281,6 @@ if __name__ == "__main__":
     slider_start_w = 0.25
     slider_width = 0.4
 
-    # def find_variable_name(value, namespace):
-    #     for name, val in namespace.items():
-    #         if val is value:
-    #             return name
-    #     return None
-
-    
-
-
-
-
 # Current problem as of 10/6 5 PM: I only want a slider for operations that are not set to "static" but update only goes through the sliders that exist.
 
     # # The function to be called anytime a slider's value changes
@@ -306,43 +292,48 @@ if __name__ == "__main__":
         ssp = []
         pos = 0
 
+        # for i in range(len(input_sliders)):
         for i, operation in enumerate(opList):
+            var_arg = operation.args
+            d = var_arg[0]
+
+            #if static, take var from 
             if operation.static:
-                # just add the static parameters to the thing
-                pass
-
-
-        for i in range(len(input_sliders)):
-            # go through each slider that exists
-
-            curr_slider_values.append(input_sliders[i].val) # take value of slider
-
-            operation = opList[i]
+                curr_slider_values.append(var_arg)
+            else:
+                sliders = input_sliders[i]
+                curr_op_params = []
+                for slider in sliders:
+                    curr_op_params.append(slider.val)
+                curr_slider_values.append(curr_op_params) # take value of slider
+                d = curr_op_params[0]
             
             if operation.op.__name__ == 'prop':
                 # if altering a propagation op, then the length of the plot must change
-                d, n = operation.args
                 start = pos
-                updated_distace = input_sliders[i].val
-                stop = pos + updated_distace
-                pos += updated_distace
+                stop = pos + d
+                pos += d
                 ssp.append((start,stop,pos))
                 if i==0:
                     curr_prop_values.append([])
                 else:
                     curr_prop_values.append(curr_slider_values[0:-1].copy())
 
-        plots[-1].prog_params = curr_slider_values
-        plots[-1].start = ssp[-1][2]
-        plots[-1].stop = ssp[-1][2]+1
-        plots[-1].set_new_data()
+        if stop_buffer:
+            plots[-1].prog_params = curr_slider_values
+            plots[-1].start = ssp[-1][2]
+            plots[-1].stop = ssp[-1][2]+1
+            plots[-1].set_new_data()
 
-        for j in range(1,len(plots)-1):
+        start_change_idx = 0
+        if start_buffer:
+            start_change_idx = 1
+
+        for j in range(start_change_idx,len(plots)-start_change_idx):
             curr_plot = plots[j]
-
-            curr_plot.start = ssp[j-1][0]
-            curr_plot.stop = ssp[j-1][1]
-            curr_plot.prog_params = curr_prop_values[j-1]
+            curr_plot.start = ssp[j][0]
+            curr_plot.stop = ssp[j][1]
+            curr_plot.prog_params = curr_prop_values[j]
             curr_plot.set_new_data()
 
 
@@ -351,35 +342,36 @@ if __name__ == "__main__":
         # fig.subplots_adjust(left=0.25, bottom=0.25)
         fig.canvas.draw_idle()
 
+    num_sliders = 0
     for i, operation in enumerate(opList):
         # go through each of the operations in opList
+        var_arg = operation.args
+        input_params.append(var_arg)
+        curr_op_sliders = []
         if not operation.static:
-            # if operation is not set to 'static'
-            # op = operation.op
-            # color = operation.color
-            # static = operation.static
-            # the argument to be varied
-            var_arg = operation.args[0]
+            count = 0
+            for arg in var_arg:
+                # if operation is not set to 'static'
+                # op = operation.op
+                # color = operation.color
+                # static = operation.static
+                # the argument to be varied
 
+                # Make a horizontal slider to control the frequency.
+                curr_ax = fig.add_axes([slider_start_w, slider_start_h + num_sliders*slider_spacing, slider_start_w + slider_width, slider_height])
+                curr_slider = Slider(
+                    ax=curr_ax,
+                    label='Parameter {}.{}'.format(i+1,count),
+                    valmin=arg*0.75,
+                    valmax=arg*1.25,
+                    valinit=arg,
+                )
 
-                # variable_name = find_variable_name(curr_param, globals())
-
-            # Make a horizontal slider to control the frequency.
-            curr_ax = fig.add_axes([slider_start_w, slider_start_h + (len(opList)-i-2)*slider_spacing, slider_start_w + slider_width, slider_height])
-            curr_slider = Slider(
-                ax=curr_ax,
-                label='Parameter {}'.format(i+1),
-                # label="{}".format(variable_name),
-                valmin=var_arg*0.75,
-                valmax=var_arg*1.25,
-                valinit=var_arg,
-            )
-
-            curr_slider.on_changed(update)
-            input_params.append(var_arg)
-            input_sliders.append(curr_slider)
-
-
+                num_sliders+=1
+                curr_slider.on_changed(update)
+                curr_op_sliders.append(curr_slider)
+                count+=1
+        input_sliders.append(curr_op_sliders)
 
 
 
