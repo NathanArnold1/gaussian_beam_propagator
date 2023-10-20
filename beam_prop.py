@@ -207,6 +207,9 @@ def make_plots(op_list, w0, z0, start_buffer = 1, stop_buffer = 1, λ = 1550e-9,
         stop = pos + stop_buffer
         p = Plot(start, stop, w0, z0, λ, 1, num_points, progressive_ops, progressive_params, 'blue')
         ret.append(p)
+
+    plt.xlim(0, pos + stop_buffer)
+
     return ret
 
 
@@ -253,7 +256,7 @@ if __name__ == "__main__":
     d3 = 1.755 # distance between spherical mirrors
     roc2 = 2 # radius of curvature of spherical mirror 2
     start_buffer = 0.00
-    stop_buffer = 0.0
+    stop_buffer = 0.00
     opList = [Op(prop, d1, 1, color='Blue', static=False), 
             Op(interface, 1, asphereIndex, inf), 
             Op(prop, asphereTc, asphereIndex, color='Red'), 
@@ -262,7 +265,7 @@ if __name__ == "__main__":
             Op(s_mirror, 2, static=False),
             Op(prop, d3, 1, color='Blue'),
             Op(s_mirror, 2),
-            Op(prop, 1, 1, color='Green')]
+            Op(prop, 1, 1, color='Blue')]
 
     # Take operations and their parameters and make plots for each one
     plots = make_plots(opList, w0, z0, start_buffer, stop_buffer)
@@ -291,8 +294,8 @@ if __name__ == "__main__":
         curr_prop_values = []
         ssp = []
         pos = 0
+        max_y = 0
 
-        # for i in range(len(input_sliders)):
         for i, operation in enumerate(opList):
             var_arg = operation.args
             d = var_arg[0]
@@ -319,27 +322,31 @@ if __name__ == "__main__":
                 else:
                     curr_prop_values.append(curr_slider_values[0:-1].copy())
 
+        stop_change_idx = 0
         if stop_buffer:
             plots[-1].prog_params = curr_slider_values
             plots[-1].start = ssp[-1][2]
-            plots[-1].stop = ssp[-1][2]+1
+            plots[-1].stop = ssp[-1][2]+stop_buffer
             plots[-1].set_new_data()
+            max_y = max(max_y, max(plots[-1].plot.get_ydata()))
+            stop_change_idx = 1
 
         start_change_idx = 0
         if start_buffer:
             start_change_idx = 1
 
-        for j in range(start_change_idx,len(plots)-start_change_idx):
+        for j in range(start_change_idx,len(plots)-stop_change_idx):
             curr_plot = plots[j]
             curr_plot.start = ssp[j][0]
             curr_plot.stop = ssp[j][1]
             curr_plot.prog_params = curr_prop_values[j]
             curr_plot.set_new_data()
-
-
+            max_y = max(max_y, max(curr_plot.plot.get_ydata()))
 
         # adjust the main plot to make room for the sliders
         # fig.subplots_adjust(left=0.25, bottom=0.25)
+        fig = plt.gcf()
+        fig.get_axes()[0].set_ylim(0,max_y)
         fig.canvas.draw_idle()
 
     num_sliders = 0
